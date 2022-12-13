@@ -5,20 +5,9 @@ on:
   push:
     branches: [ "main" ]
 env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: Release
-  QT5FNVER:  5-15-7
-  QT5REPO:   https://github.com/qt/qt5.git
-  JOM_DL:    https://download.qt.io/official_releases/jom/jom_1_1_3.zip
-  BUILD_PLATFORM: x64
-  BUILD_CONFIGURATION: Release
-  VCPKG_BUILD_TYPE: release
-
-
+  QT5_CURRENT_VER: 5.15.7
 jobs:
-
   release_job:
-
       runs-on: ubuntu-latest
       outputs:
           upload_url: ${{steps.create_release.outputs.upload_url}}
@@ -27,7 +16,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Get Release tag
         run: |
-            echo "RELEASE_VERSION=v5.15.7" >> $GITHUB_ENV
+            echo "RELEASE_VERSION=v${{env.QT5_CURRENT_VER}}" >> $GITHUB_ENV
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -35,7 +24,7 @@ jobs:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
             tag_name: ${{ github.ref }}
-            release_name: Release Qt5 5.15.7 ${{ github.ref }}
+            release_name: Qt5 ${{env.QT5_CURRENT_VER}}
             draft: false
             prerelease: false
 
@@ -57,7 +46,7 @@ jobs:
       - name: Install jom
         run: |
             cd ${{runner.workspace}}
-            Invoke-WebRequest ${{env.JOM_DL}} -OutFile .\jom.zip
+            Invoke-WebRequest https://download.qt.io/official_releases/jom/jom_1_1_3.zip -OutFile .\jom.zip
             expand-archive -path "jom.zip"
             echo "${{runner.workspace}}\jom" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
             dir "${{runner.workspace}}\jom"
@@ -70,11 +59,8 @@ jobs:
       - name: Compile static Qt version
         run: |
             echo ${{runner.workspace}}
-            dir
-            # ${{runner.workspace}}\jom\jom.exe /H
             cd ..
-            git clone --branch 5.15 --depth 1 ${{env.QT5REPO}} qt5
-            dir
+            git clone --branch 5.15 --depth 1 https://github.com/qt/qt5.git qt5
             cd qt5
             perl init-repository -f --module-subset=default,qtcharts,qtserialport,-qtactiveqt,-qtcanvas3d,-qtconnectivity,-qtdeclarative,-qtquickcontrols2,-qtsvg,-qtquickcontrols,-qtwebengine,-qtdoc,-qtgraphicaleffects,-qtqa,-qttranslations,-qtvirtualkeyboard,-qtquick3d,-qtrepotools,-qttools,-qtshadertools,-qtimageformats,-qtnetworkauth,-qtwebsockets,-qt3d,-qtmultimedia,-qtdatavis3d,-qtscript,-qtspeech,-qtwebchannel,-qtwebglplugin,-qtwebview,-qtwinextras,-qtxmlpatterns
             # Create shadow build folder
@@ -93,7 +79,7 @@ jobs:
           OPENSSL_LIBS: -llibssl -llibcrypto
       - name: Package binaries
         run: |
-            7z a ${{runner.workspace}}/qt5_${{env.QT5FNVER}}_win-msvc2019-x64.zip ..\Qt5bin
+            7z a ${{runner.workspace}}/qt5_${{env.QT5_CURRENT_VER}}_win-msvc2019-x64.zip ..\Qt5bin
       - name: Upload Release Asset
         id: upload-release-asset
         uses: actions/upload-release-asset@v1
@@ -101,6 +87,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{needs.release_job.outputs.upload_url}}
-          asset_path: ${{runner.workspace}}/qt5_${{env.QT5FNVER}}_msvc2019-x64.zip
+          asset_path: ${{runner.workspace}}/qt5_${{env.QT5_CURRENT_VER}}_msvc2019-x64.zip
           asset_name: qt5_${{env.QT5FNVER}}_static_win-msvc2019-x64.zip
           asset_content_type: application/zip
