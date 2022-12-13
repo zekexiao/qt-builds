@@ -1,0 +1,110 @@
+
+name: Build and Upload QT5 Release Asset
+
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
+  QT5FNVER:  5-15-7
+  # QT5REPO:   https://code.qt.io/qt/qt5.git
+  QT5REPO:   https://github.com/qt/qt5.git
+  JOM_DL:    https://download.qt.io/official_releases/jom/jom_1_1_3.zip
+  BUILD_PLATFORM: x64
+  BUILD_CONFIGURATION: Release
+  VCPKG_BUILD_TYPE: release
+
+
+jobs:
+
+  release_job:
+
+      runs-on: ubuntu-latest
+      outputs:
+          upload_url: ${{steps.create_release.outputs.upload_url}}
+          release_version: ${{env.RELEASE_VERSION}}
+      steps:
+      - uses: actions/checkout@v3
+      - name: Get Release tag
+        run: |
+            echo "RELEASE_VERSION=v5.15.7" >> $GITHUB_ENV
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+            tag_name: ${{ github.ref }}
+            release_name: Release Qt5 5.15.7 ${{ github.ref }}
+            draft: false
+            prerelease: false
+
+  build-msvc-on-windows:
+
+      needs: [release_job]
+      # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+      # windows-latest or windows-2022 fail!?
+      runs-on: windows-2019
+
+      steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+      - name: Install Python 3.9
+        uses: actions/setup-python@v4
+        with:
+            python-version: '3.9'
+            architecture: 'x64'
+      - name: Install jom
+        run: |
+            cd ${{runner.workspace}}
+            Invoke-WebRequest ${{env.JOM_DL}} -OutFile .\jom.zip
+            expand-archive -path "jom.zip"
+            echo "${{runner.workspace}}\jom" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            dir "${{runner.workspace}}\jom"
+      - name: VcPkg
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: vcpkg integrate install
+      - name: VcPkg OpenSSL
+        working-directory: ${{env.GITHUB_WORKSPACE}}
+        run: vcpkg --triplet x64-windows-static install openssl
+      - name: Compile static Qt version
+        run: |
+            echo ${{runner.workspace}}
+            dir
+            # ${{runner.workspace}}\jom\jom.exe /H
+            cd ..
+            git clone --branch 5.15 --depth 1 ${{env.QT5REPO}} qt5
+            dir
+            cd qt5
+            perl init-repository -f --module-subset=default,qtcharts,qtserialport,-qtactiveqt,-qtcanvas3d,-qtconnectivity,-qtdeclarative,-qtquickcontrols2,-qtsvg,-qtquickcontrols,-qtwebengine,-qtdoc,-qtgraphicaleffects,-qtqa,-qttranslations,-qtvirtualkeyboard,-qtquick3d,-qtrepotools,-qttools,-qtshadertools,-qtimageformats,-qtnetworkauth,-qtwebsockets,-qt3d,-qtmultimedia,-qtdatavis3d,-qtscript,-qtspeech,-qtwebchannel,-qtwebglplugin,-qtwebview,-qtwinextras,-qtxmlpatterns
+            # Create shadow build folder
+            cd ${{runner.workspace}}
+            mkdir qt5_shadow
+            cd ${{runner.workspace}}\qt5_shadow
+            # Setup the compiler
+            cmd.exe /c "call `"C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat`" && set > %temp%\vcvars.txt"
+            Get-Content "$env:temp\vcvars.txt" | Foreach-Object { if ($_ -match "^(.*?)=(.*)$") { Set-Content "env:\$($matches[1])" $matches[2] } }
+            # Configure Qt5
+            ..\qt5\configure.bat -debug-and-release -no-pch -optimize-size -opengl desktop -platform win32-msvc -prefix "..\Qt5bin" -qt-zlib -qt-libjpeg -qt-libpng -qt-freetype -qt-pcre -skip webengine -nomake tools -nomake tests -nomake examples -opensource -openssl -openssl-linked -I $env:VCPKG_INSTALLATION_ROOT/installed/x64-windows-static/include -L $env:VCPKG_INSTALLATION_ROOT/installed/x64-windows-static/lib -confirm-license
+            ${{runner.workspace}}\jom\jom.exe -j4
+            nmake install
+            dir ${{runner.workspace}}\Qt5bin
+        env:
+          OPENSSL_LIBS: -llibssl -llibcrypto
+      - name: Package binaries
+        run: |
+            7z a ${{runner.workspace}}/qt5_${{env.QT5FNVER}}_static_win-msvc2019-x64.zip ..\Qt5bin
+      - name: Upload Release Asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{needs.release_job.outputs.upload_url}}
+          asset_path: ${{runner.workspace}}/qt5_${{env.QT5FNVER}}_msvc2019-x64.zip
+          asset_name: qt5_${{env.QT5FNVER}}_static_win-msvc2019-x64.zip
+          asset_content_type: application/zip
