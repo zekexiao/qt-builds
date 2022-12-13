@@ -8,7 +8,6 @@ env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
   QT5FNVER:  5-15-7
-  # QT5REPO:   https://code.qt.io/qt/qt5.git
   QT5REPO:   https://github.com/qt/qt5.git
   JOM_DL:    https://download.qt.io/official_releases/jom/jom_1_1_3.zip
   BUILD_PLATFORM: x64
@@ -94,7 +93,7 @@ jobs:
           OPENSSL_LIBS: -llibssl -llibcrypto
       - name: Package binaries
         run: |
-            7z a ${{runner.workspace}}/qt5_${{env.QT5FNVER}}_static_win-msvc2019-x64.zip ..\Qt5bin
+            7z a ${{runner.workspace}}/qt5_${{env.QT5FNVER}}_win-msvc2019-x64.zip ..\Qt5bin
       - name: Upload Release Asset
         id: upload-release-asset
         uses: actions/upload-release-asset@v1
