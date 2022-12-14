@@ -79,7 +79,7 @@ jobs:
           OPENSSL_LIBS: -llibssl -llibcrypto
       - name: Package binaries
         run: |
-            7z a ${{runner.workspace}}/qt5_${{env.QT5_CURRENT_VER}}_win-msvc2019-x64.zip ..\Qt5bin
+            7z a ${{runner.workspace}}/qt5_${{env.QT5_CURRENT_VER}}_msvc2019-x64.zip ..\Qt5bin
       - name: Upload Release Asset
         id: upload-release-asset
         uses: actions/upload-release-asset@v1
