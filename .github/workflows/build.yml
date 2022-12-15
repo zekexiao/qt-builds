@@ -88,5 +88,5 @@ jobs:
         with:
           upload_url: ${{needs.release_job.outputs.upload_url}}
           asset_path: ${{runner.workspace}}/qt5_${{env.QT5_CURRENT_VER}}_msvc2019-x64.zip
-          asset_name: qt5_${{env.QT5FNVER}}_static_win-msvc2019-x64.zip
+          asset_name: qt5_${{env.QT5_CURRENT_VER}}_win-msvc2019-x64.zip
           asset_content_type: application/zip
