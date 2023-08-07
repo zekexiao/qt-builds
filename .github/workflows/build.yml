@@ -5,7 +5,7 @@ on:
   push:
     branches: [ "main" ]
 env:
-  QT5_CURRENT_VER: 5.15.7
+  QT5_CURRENT_VER: 5.15.10
 jobs:
   release_job:
       runs-on: ubuntu-latest
